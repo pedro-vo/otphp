@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace OTPHP\Test;
 
+use DateTimeImmutable;
 use InvalidArgumentException;
 use Iterator;
+use OTPHP\InternalClock;
 use OTPHP\TOTP;
 use OTPHP\TOTPInterface;
 use ParagonIE\ConstantTime\Base32;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Psr\Clock\ClockInterface;
 use RuntimeException;
 use Symfony\Bridge\PhpUnit\ClockMock;
 use function assert;
@@ -26,14 +29,14 @@ final class TOTPTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('The label is not set.');
-        $otp = TOTP::generate();
+        $otp = TOTP::generate(new InternalClock());
         $otp->getProvisioningUri();
     }
 
     #[Test]
     public function customParameter(): void
     {
-        $otp = TOTP::createFromSecret('JDDK4U6G3BJLEZ7Y');
+        $otp = TOTP::createFromSecret('JDDK4U6G3BJLEZ7Y', new InternalClock());
         $otp->setPeriod(20);
         $otp->setDigest('sha512');
         $otp->setDigits(8);
@@ -51,7 +54,7 @@ final class TOTPTest extends TestCase
     #[Test]
     public function objectCreationValid(): void
     {
-        $otp = TOTP::generate();
+        $otp = TOTP::generate(new InternalClock());
 
         static::assertMatchesRegularExpression('/^[A-Z2-7]+$/', $otp->getSecret());
     }
@@ -59,7 +62,7 @@ final class TOTPTest extends TestCase
     #[Test]
     public function periodIsNot1OrMore(): void
     {
-        $totp = TOTP::createFromSecret('JDDK4U6G3BJLEZ7Y');
+        $totp = TOTP::createFromSecret('JDDK4U6G3BJLEZ7Y', new InternalClock());
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Period must be at least 1.');
@@ -69,7 +72,7 @@ final class TOTPTest extends TestCase
     #[Test]
     public function epochIsNot0OrMore(): void
     {
-        $totp = TOTP::createFromSecret('JDDK4U6G3BJLEZ7Y');
+        $totp = TOTP::createFromSecret('JDDK4U6G3BJLEZ7Y', new InternalClock());
 
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Epoch must be greater than or equal to 0.');
@@ -83,7 +86,7 @@ final class TOTPTest extends TestCase
         $this->expectExceptionMessage('Unable to decode the secret. Is it correctly base32 encoded?');
         $secret = random_bytes(32);
 
-        $otp = TOTP::createFromSecret($secret);
+        $otp = TOTP::createFromSecret($secret, new InternalClock());
         $otp->now();
     }
 
@@ -116,13 +119,13 @@ final class TOTPTest extends TestCase
      * @param positive-int $period
      * @param positive-int $expectedRemainder
      */
-    #[DataProvider('dataRemainingTimeBeforeExpiration')]
     #[Test]
+    #[DataProvider('dataRemainingTimeBeforeExpiration')]
     public function getRemainingTimeBeforeExpiration(int $timestamp, int $period, int $expectedRemainder): void
     {
-        ClockMock::register(TOTP::class);
-        ClockMock::withClockMock($timestamp);
-        $otp = self::createTOTP(6, 'sha1', $period);
+        $clock = new ClockMock();
+        $clock->setDateTime(DateTimeImmutable::createFromFormat('U', (string) $timestamp));
+        $otp = self::createTOTP(6, 'sha1', $period, clock: $clock);
 
         static::assertSame($expectedRemainder, $otp->expiresIn());
     }
@@ -133,8 +136,8 @@ final class TOTPTest extends TestCase
         $otp = self::createTOTP(6, 'sha1', 30);
 
         static::assertSame('855783', $otp->at(0));
-        static::assertSame('762124', $otp->at(319690800));
-        static::assertSame('139664', $otp->at(1301012137));
+        static::assertSame('762124', $otp->at(319_690_800));
+        static::assertSame('139664', $otp->at(1_301_012_137));
     }
 
     #[Test]
@@ -143,8 +146,8 @@ final class TOTPTest extends TestCase
         $otp = self::createTOTP(6, 'sha1', 30, 'JDDK4U6G3BJLEZ7Y', 'alice@foo.bar', 'My Project', 100);
 
         static::assertSame('855783', $otp->at(100));
-        static::assertSame('762124', $otp->at(319690900));
-        static::assertSame('139664', $otp->at(1301012237));
+        static::assertSame('762124', $otp->at(319_690_900));
+        static::assertSame('139664', $otp->at(1_301_012_237));
     }
 
     #[Test]
@@ -162,24 +165,24 @@ final class TOTPTest extends TestCase
     #[Test]
     public function generateOtpNow(): void
     {
-        ClockMock::register(TOTP::class);
-        $time = time();
-        ClockMock::withClockMock($time);
-        $otp = self::createTOTP(6, 'sha1', 30);
+        $clock = new ClockMock();
+        $timestamp = time();
+        $clock->setDateTime(DateTimeImmutable::createFromFormat('U', (string) $timestamp));
+        $otp = self::createTOTP(6, 'sha1', 30, clock: $clock);
 
-        static::assertSame($otp->now(), $otp->at($time));
+        static::assertSame($otp->now(), $otp->at($timestamp));
     }
 
     #[Test]
     public function verifyOtpNow(): void
     {
-        ClockMock::register(TOTP::class);
-        $time = time();
-        ClockMock::withClockMock($time);
-        $otp = self::createTOTP(6, 'sha1', 30);
+        $timestamp = time();
+        $clock = new ClockMock();
+        $clock->setDateTime(DateTimeImmutable::createFromFormat('U', (string) $timestamp));
+        $otp = self::createTOTP(6, 'sha1', 30, clock: $clock);
 
-        $totp = $otp->at($time);
-        static::assertTrue($otp->verify($totp, $time));
+        $totp = $otp->at($timestamp);
+        static::assertTrue($otp->verify($totp, $timestamp));
     }
 
     #[Test]
@@ -188,12 +191,12 @@ final class TOTPTest extends TestCase
         $otp = self::createTOTP(6, 'sha1', 30);
 
         static::assertTrue($otp->verify('855783', 0));
-        static::assertTrue($otp->verify('762124', 319690800));
-        static::assertTrue($otp->verify('139664', 1301012137));
+        static::assertTrue($otp->verify('762124', 319_690_800));
+        static::assertTrue($otp->verify('139664', 1_301_012_137));
 
-        static::assertFalse($otp->verify('139664', 1301012107));
-        static::assertFalse($otp->verify('139664', 1301012167));
-        static::assertFalse($otp->verify('139664', 1301012197));
+        static::assertFalse($otp->verify('139664', 1_301_012_107));
+        static::assertFalse($otp->verify('139664', 1_301_012_167));
+        static::assertFalse($otp->verify('139664', 1_301_012_197));
     }
 
     #[Test]
@@ -202,12 +205,12 @@ final class TOTPTest extends TestCase
         $otp = self::createTOTP(6, 'sha1', 30, 'JDDK4U6G3BJLEZ7Y', 'alice@foo.bar', 'My Project', 100);
 
         static::assertTrue($otp->verify('855783', 100));
-        static::assertTrue($otp->verify('762124', 319690900));
-        static::assertTrue($otp->verify('139664', 1301012237));
+        static::assertTrue($otp->verify('762124', 319_690_900));
+        static::assertTrue($otp->verify('139664', 1_301_012_237));
 
-        static::assertFalse($otp->verify('139664', 1301012207));
-        static::assertFalse($otp->verify('139664', 1301012267));
-        static::assertFalse($otp->verify('139664', 1301012297));
+        static::assertFalse($otp->verify('139664', 1_301_012_207));
+        static::assertFalse($otp->verify('139664', 1_301_012_267));
+        static::assertFalse($otp->verify('139664', 1_301_012_297));
     }
 
     #[Test]
@@ -224,10 +227,10 @@ final class TOTPTest extends TestCase
     /**
      * @param TOTPInterface $totp
      * @param positive-int      $timestamp
-     * @param non-empty-string  $expected_value
+     * @param non-empty-string $expected_value
      */
-    #[DataProvider('dataVectors')]
     #[Test]
+    #[DataProvider('dataVectors')]
     public function vectors($totp, $timestamp, $expected_value): void
     {
         static::assertSame($expected_value, $totp->at($timestamp));
@@ -237,6 +240,8 @@ final class TOTPTest extends TestCase
     /**
      * @see https://tools.ietf.org/html/rfc6238#appendix-B
      * @see http://www.rfc-editor.org/errata_search.php?rfc=6238
+     *
+     *  @return array<int, mixed[]>
      */
     public static function dataVectors(): Iterator
     {
@@ -252,21 +257,21 @@ final class TOTPTest extends TestCase
         yield [$totp_sha1, 59, '94287082'];
         yield [$totp_sha256, 59, '46119246'];
         yield [$totp_sha512, 59, '90693936'];
-        yield [$totp_sha1, 1111111109, '07081804'];
-        yield [$totp_sha256, 1111111109, '68084774'];
-        yield [$totp_sha512, 1111111109, '25091201'];
-        yield [$totp_sha1, 1111111111, '14050471'];
-        yield [$totp_sha256, 1111111111, '67062674'];
-        yield [$totp_sha512, 1111111111, '99943326'];
-        yield [$totp_sha1, 1234567890, '89005924'];
-        yield [$totp_sha256, 1234567890, '91819424'];
-        yield [$totp_sha512, 1234567890, '93441116'];
-        yield [$totp_sha1, 2000000000, '69279037'];
-        yield [$totp_sha256, 2000000000, '90698825'];
-        yield [$totp_sha512, 2000000000, '38618901'];
-        yield [$totp_sha1, 20000000000, '65353130'];
-        yield [$totp_sha256, 20000000000, '77737706'];
-        yield [$totp_sha512, 20000000000, '47863826'];
+        yield [$totp_sha1, 1_111_111_109, '07081804'];
+        yield [$totp_sha256, 1_111_111_109, '68084774'];
+        yield [$totp_sha512, 1_111_111_109, '25091201'];
+        yield [$totp_sha1, 1_111_111_111, '14050471'];
+        yield [$totp_sha256, 1_111_111_111, '67062674'];
+        yield [$totp_sha512, 1_111_111_111, '99943326'];
+        yield [$totp_sha1, 1_234_567_890, '89005924'];
+        yield [$totp_sha256, 1_234_567_890, '91819424'];
+        yield [$totp_sha512, 1_234_567_890, '93441116'];
+        yield [$totp_sha1, 2_000_000_000, '69279037'];
+        yield [$totp_sha256, 2_000_000_000, '90698825'];
+        yield [$totp_sha512, 2_000_000_000, '38618901'];
+        yield [$totp_sha1, 20_000_000_000, '65353130'];
+        yield [$totp_sha256, 20_000_000_000, '77737706'];
+        yield [$totp_sha512, 20_000_000_000, '47863826'];
     }
 
     #[Test]
@@ -283,13 +288,13 @@ final class TOTPTest extends TestCase
      * @param non-empty-string $input
      * @param 0|positive-int $leeway
      */
-    #[DataProvider('dataLeeway')]
     #[Test]
+    #[DataProvider('dataLeeway')]
     public function verifyOtpInWindow(int $timestamp, string $input, int $leeway, bool $expectedResult): void
     {
-        ClockMock::register(TOTP::class);
-        ClockMock::withClockMock($timestamp);
-        $otp = self::createTOTP(6, 'sha1', 30);
+        $clock = new ClockMock();
+        $clock->setDateTime(DateTimeImmutable::createFromFormat('U', (string) $timestamp));
+        $otp = self::createTOTP(6, 'sha1', 30, clock: $clock);
 
         static::assertSame($expectedResult, $otp->verify($input, null, $leeway));
     }
@@ -299,8 +304,8 @@ final class TOTPTest extends TestCase
      * @param non-empty-string $input
      * @param 0|positive-int $leeway
      */
-    #[DataProvider('dataLeewayWithEpoch')]
     #[Test]
+    #[DataProvider('dataLeewayWithEpoch')]
     public function verifyOtpWithEpochInWindow(
         int $timestamp,
         string $input,
@@ -316,27 +321,17 @@ final class TOTPTest extends TestCase
 
     public static function dataLeewayWithEpoch(): Iterator
     {
-        yield [319690889, '762124', 10, false];
-        //Leeway of 10 seconds, **out** the period of 11sec
-        yield [319690890, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 10sec
-        yield [319690899, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 1sec
-        yield [319690899, '762124', 0, false];
-        //No leeway, **out** the period
-        yield [319690900, '762124', 0, true];
-        //No leeway, in the period
-        yield [319690920, '762124', 0, true];
-        //No leeway, in the period
-        yield [319690929, '762124', 0, true];
-        //No leeway, in the period
-        yield [319690930, '762124', 0, false];
-        //No leeway, **out** the period
-        yield [319690930, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 1sec
-        yield [319690939, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 10sec
-        yield [319690940, '762124', 10, false];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_889, '762124', 10, false];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_890, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_899, '762124', 10, true];
+        yield 'No leeway, **out** the period' => [319_690_899, '762124', 0, false];
+        yield 'No leeway, in the period' => [319_690_900, '762124', 0, true];
+        yield 'No leeway, in the period' => [319_690_920, '762124', 0, true];
+        yield 'No leeway, in the period' => [319_690_929, '762124', 0, true];
+        yield 'No leeway, **out** the period' => [319_690_930, '762124', 0, false];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_930, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_939, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_940, '762124', 10, false];
     }
 
     #[Test]
@@ -360,55 +355,48 @@ final class TOTPTest extends TestCase
         );
     }
 
+    /**
+     * @return int[][]
+     */
     public static function dataRemainingTimeBeforeExpiration(): Iterator
     {
-        yield [1644926810, 90, 40];
-        yield [1644926810, 30, 10];
-        yield [1644926810, 20, 10];
-        yield [1577833199, 90, 1];
-        yield [1577833199, 30, 1];
-        yield [1577833199, 20, 1];
-        yield [1577833200, 90, 90];
-        yield [1577833200, 30, 30];
-        yield [1577833200, 20, 20];
-        yield [1577833201, 90, 89];
-        yield [1577833201, 30, 29];
-        yield [1577833201, 20, 19];
-    }
-
-    public static function dataLeeway(): Iterator
-    {
-        yield [319690789, '762124', 10, false];
-        //Leeway of 10 seconds, **out** the period of 11sec
-        yield [319690790, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 10sec
-        yield [319690799, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 1sec
-        yield [319690799, '762124', 0, false];
-        //No leeway, **out** the period
-        yield [319690800, '762124', 0, true];
-        //No leeway, in the period
-        yield [319690820, '762124', 0, true];
-        //No leeway, in the period
-        yield [319690829, '762124', 0, true];
-        //No leeway, in the period
-        yield [319690830, '762124', 0, false];
-        //No leeway, **out** the period
-        yield [319690830, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 1sec
-        yield [319690839, '762124', 10, true];
-        //Leeway of 10 seconds, **out** the period of 10sec
-        yield [319690840, '762124', 10, false];
+        yield [1_644_926_810, 90, 40];
+        yield [1_644_926_810, 30, 10];
+        yield [1_644_926_810, 20, 10];
+        yield [1_577_833_199, 90, 1];
+        yield [1_577_833_199, 30, 1];
+        yield [1_577_833_199, 20, 1];
+        yield [1_577_833_200, 90, 90];
+        yield [1_577_833_200, 30, 30];
+        yield [1_577_833_200, 20, 20];
+        yield [1_577_833_201, 90, 89];
+        yield [1_577_833_201, 30, 29];
+        yield [1_577_833_201, 20, 19];
     }
 
     /**
-     * @param positive-int $digits
+     * @return array<int, int|string|bool>[]
+     */
+    public static function dataLeeway(): Iterator
+    {
+        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_789, '762124', 10, false];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_790, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_799, '762124', 10, true];
+        yield 'No leeway, **out** the period' => [319_690_799, '762124', 0, false];
+        yield 'No leeway, in the period' => [319_690_800, '762124', 0, true];
+        yield 'No leeway, in the period' => [319_690_820, '762124', 0, true];
+        yield 'No leeway, in the period' => [319_690_829, '762124', 0, true];
+        yield 'No leeway, **out** the period' => [319_690_830, '762124', 0, false];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_830, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_839, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_840, '762124', 10, false];
+    }
+
+    /**
      * @param non-empty-string $digest
-     * @param positive-int $period
      * @param non-empty-string $secret
      * @param non-empty-string $label
      * @param non-empty-string $issuer
-     * @param 0|positive-int $epoch
      */
     private static function createTOTP(
         int $digits,
@@ -417,9 +405,14 @@ final class TOTPTest extends TestCase
         string $secret = 'JDDK4U6G3BJLEZ7Y',
         string $label = 'alice@foo.bar',
         string $issuer = 'My Project',
-        int $epoch = 0
+        int $epoch = 0,
+        ?ClockInterface $clock = null
     ): TOTP {
-        $otp = TOTP::createFromSecret($secret);
+        static::assertNotSame('', $secret);
+        static::assertNotSame('', $digest);
+        $clock ??= new InternalClock();
+
+        $otp = TOTP::createFromSecret($secret, $clock);
         $otp->setPeriod($period);
         $otp->setDigest($digest);
         $otp->setDigits($digits);

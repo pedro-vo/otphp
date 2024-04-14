@@ -7,6 +7,7 @@ namespace OTPHP\Test;
 use InvalidArgumentException;
 use OTPHP\Factory;
 use OTPHP\HOTP;
+use OTPHP\InternalClock;
 use OTPHP\TOTP;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -20,7 +21,7 @@ final class FactoryTest extends TestCase
     public function tOTPLoad(): void
     {
         $otp = 'otpauth://totp/My%20Project%3Aalice%40foo.bar?algorithm=sha512&digits=8&foo=bar.baz&issuer=My%20Project&period=20&secret=JDDK4U6G3BJLEZ7Y';
-        $result = Factory::loadFromProvisioningUri($otp);
+        $result = Factory::loadFromProvisioningUri($otp, new InternalClock());
 
         static::assertInstanceOf(TOTP::class, $result);
         static::assertSame('My Project', $result->getIssuer());
@@ -41,7 +42,7 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Parameter "image" does not exist');
         $otp = 'otpauth://totp/My%20Project%3Aalice%40foo.bar?algorithm=sha512&digits=8&foo=bar.baz&issuer=My%20Project&period=20&secret=JDDK4U6G3BJLEZ7Y';
-        $result = Factory::loadFromProvisioningUri($otp);
+        $result = Factory::loadFromProvisioningUri($otp, new InternalClock());
 
         $result->getParameter('image');
     }
@@ -50,7 +51,7 @@ final class FactoryTest extends TestCase
     public function hOTPLoad(): void
     {
         $otp = 'otpauth://hotp/My%20Project%3Aalice%40foo.bar?counter=1000&digits=8&image=https%3A%2F%2Ffoo.bar%2Fbaz&issuer=My%20Project&secret=JDDK4U6G3BJLEZ7Y';
-        $result = Factory::loadFromProvisioningUri($otp);
+        $result = Factory::loadFromProvisioningUri($otp, new InternalClock());
 
         static::assertInstanceOf(HOTP::class, $result);
         static::assertSame('My Project', $result->getIssuer());
@@ -70,7 +71,7 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Not a valid OTP provisioning URI');
         $otp = 'Hello !';
-        Factory::loadFromProvisioningUri($otp);
+        Factory::loadFromProvisioningUri($otp, new InternalClock());
     }
 
     #[Test]
@@ -79,7 +80,7 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Not a valid OTP provisioning URI');
         $otp = 'https://foo.bar/';
-        Factory::loadFromProvisioningUri($otp);
+        Factory::loadFromProvisioningUri($otp, new InternalClock());
     }
 
     #[Test]
@@ -88,7 +89,7 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Unsupported "foo" OTP type');
         $otp = 'otpauth://foo/My%20Project%3Aalice%40foo.bar?counter=1000&digits=8&image=https%3A%2F%2Ffoo.bar%2Fbaz&issuer=My%20Project&secret=JDDK4U6G3BJLEZ7Y';
-        Factory::loadFromProvisioningUri($otp);
+        Factory::loadFromProvisioningUri($otp, new InternalClock());
     }
 
     #[Test]
@@ -97,7 +98,7 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Not a valid OTP provisioning URI');
         $otp = 'otpauth://hotp:My%20Project%3Aalice%40foo.bar?counter=1000&digits=8&image=https%3A%2F%2Ffoo.bar%2Fbaz&issuer=My%20Project&secret=JDDK4U6G3BJLEZ7Y';
-        Factory::loadFromProvisioningUri($otp);
+        Factory::loadFromProvisioningUri($otp, new InternalClock());
     }
 
     #[Test]
@@ -106,7 +107,7 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Not a valid OTP provisioning URI');
         $otp = 'bar://hotp/My%20Project%3Aalice%40foo.bar?counter=1000&digits=8&image=https%3A%2F%2Ffoo.bar%2Fbaz&issuer=My%20Project&secret=JDDK4U6G3BJLEZ7Y';
-        Factory::loadFromProvisioningUri($otp);
+        Factory::loadFromProvisioningUri($otp, new InternalClock());
     }
 
     #[Test]
@@ -115,14 +116,14 @@ final class FactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid OTP: invalid issuer in parameter');
         $otp = 'otpauth://hotp/My%20Project2%3Aalice%40foo.bar?counter=1000&digits=8&image=https%3A%2F%2Ffoo.bar%2Fbaz&issuer=My%20Project&secret=JDDK4U6G3BJLEZ7Y';
-        Factory::loadFromProvisioningUri($otp);
+        Factory::loadFromProvisioningUri($otp, new InternalClock());
     }
 
     #[Test]
     public function tOTPLoadWithoutIssuer(): void
     {
         $otp = 'otpauth://totp/My%20Test%20-%20Auth?secret=JDDK4U6G3BJLEZ7Y';
-        $result = Factory::loadFromProvisioningUri($otp);
+        $result = Factory::loadFromProvisioningUri($otp, new InternalClock());
 
         static::assertInstanceOf(TOTP::class, $result);
         static::assertNull($result->getIssuer());
@@ -139,7 +140,7 @@ final class FactoryTest extends TestCase
     public function tOTPLoadAndRemoveSecretTrailingCharacters(): void
     {
         $uri = 'otpauth://totp/My%20Test%20-%20Auth?secret=JDDK4U6G3BJLEQ%3D%3D';
-        $totp = Factory::loadFromProvisioningUri($uri);
+        $totp = Factory::loadFromProvisioningUri($uri, new InternalClock());
 
         static::assertInstanceOf(TOTP::class, $totp);
         static::assertSame('JDDK4U6G3BJLEQ', $totp->getSecret());

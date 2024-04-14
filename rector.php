@@ -12,7 +12,7 @@ use Rector\ValueObject\PhpVersion;
 
 return static function (RectorConfig $config): void {
     $config->import(SetList::DEAD_CODE);
-    $config->import(LevelSetList::UP_TO_PHP_80);
+    $config->import(LevelSetList::UP_TO_PHP_81);
     $config->import(SymfonySetList::SYMFONY_CODE_QUALITY);
     $config->import(PHPUnitSetList::PHPUNIT_100);
     $config->import(PHPUnitSetList::ANNOTATIONS_TO_ATTRIBUTES);
@@ -21,6 +21,7 @@ return static function (RectorConfig $config): void {
     $config->paths([__DIR__ . '/src', __DIR__ . '/tests']);
     $config->skip([PreferPHPUnitThisCallRector::class]);
     $config->phpVersion(PhpVersion::PHP_81);
+    $config->parallel();
     $config->importNames();
     $config->importShortClasses();
 };
