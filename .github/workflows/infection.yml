@@ -10,6 +10,7 @@ on:
 jobs:
   mutation_testing:
     name: "5️⃣ Mutation Testing"
+    runs-on: "ubuntu-latest"
     steps:
       - name: "Set up PHP"
         uses: "shivammathur/setup-php@v2"
