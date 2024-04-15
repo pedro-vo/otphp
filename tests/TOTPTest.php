@@ -16,7 +16,6 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Clock\ClockInterface;
 use RuntimeException;
-use Symfony\Bridge\PhpUnit\ClockMock;
 use function assert;
 
 /**
@@ -286,7 +285,7 @@ final class TOTPTest extends TestCase
     /**
      * @param positive-int $timestamp
      * @param non-empty-string $input
-     * @param 0|positive-int $leeway
+     * @param positive-int $leeway
      */
     #[Test]
     #[DataProvider('dataLeeway')]
@@ -302,7 +301,7 @@ final class TOTPTest extends TestCase
     /**
      * @param positive-int $timestamp
      * @param non-empty-string $input
-     * @param 0|positive-int $leeway
+     * @param positive-int $leeway
      */
     #[Test]
     #[DataProvider('dataLeewayWithEpoch')]
@@ -312,8 +311,8 @@ final class TOTPTest extends TestCase
         int $leeway,
         bool $expectedResult
     ): void {
-        ClockMock::register(TOTP::class);
-        ClockMock::withClockMock($timestamp);
+        $clock = new ClockMock();
+        $clock->setDateTime(DateTimeImmutable::createFromFormat('U', (string) $timestamp));
         $otp = self::createTOTP(6, 'sha1', 30, 'JDDK4U6G3BJLEZ7Y', 'alice@foo.bar', 'My Project', 100);
 
         static::assertSame($expectedResult, $otp->verify($input, null, $leeway));
@@ -321,17 +320,37 @@ final class TOTPTest extends TestCase
 
     public static function dataLeewayWithEpoch(): Iterator
     {
-        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_889, '762124', 10, false];
-        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_890, '762124', 10, true];
-        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_899, '762124', 10, true];
-        yield 'No leeway, **out** the period' => [319_690_899, '762124', 0, false];
-        yield 'No leeway, in the period' => [319_690_900, '762124', 0, true];
-        yield 'No leeway, in the period' => [319_690_920, '762124', 0, true];
-        yield 'No leeway, in the period' => [319_690_929, '762124', 0, true];
-        yield 'No leeway, **out** the period' => [319_690_930, '762124', 0, false];
-        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_930, '762124', 10, true];
-        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_939, '762124', 10, true];
-        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_940, '762124', 10, false];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second before)' => [
+            319_690_889,
+            '762124',
+            10,
+            false,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second before)' => [
+            319_690_890,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period (1 second before)' => [319_690_899, '762124', 10, true];
+        yield 'No leeway, **out** the period (1 second before)' => [319_690_899, '762124', 0, false];
+        yield 'No leeway, in the period (start)' => [319_690_900, '762124', 0, true];
+        yield 'No leeway, in the period (middle)' => [319_690_920, '762124', 0, true];
+        yield 'No leeway, in the period (end)' => [319_690_929, '762124', 0, true];
+        yield 'No leeway, **out** the period (1 second after)' => [319_690_930, '762124', 0, false];
+        yield 'Leeway of 10 seconds, **out** the period (1 second after)' => [319_690_930, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second after)' => [
+            319_690_939,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second after)' => [
+            319_690_940,
+            '762124',
+            10,
+            false,
+        ];
     }
 
     #[Test]
@@ -379,17 +398,37 @@ final class TOTPTest extends TestCase
      */
     public static function dataLeeway(): Iterator
     {
-        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_789, '762124', 10, false];
-        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_790, '762124', 10, true];
-        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_799, '762124', 10, true];
-        yield 'No leeway, **out** the period' => [319_690_799, '762124', 0, false];
-        yield 'No leeway, in the period' => [319_690_800, '762124', 0, true];
-        yield 'No leeway, in the period' => [319_690_820, '762124', 0, true];
-        yield 'No leeway, in the period' => [319_690_829, '762124', 0, true];
-        yield 'No leeway, **out** the period' => [319_690_830, '762124', 0, false];
-        yield 'Leeway of 10 seconds, **out** the period of 1sec' => [319_690_830, '762124', 10, true];
-        yield 'Leeway of 10 seconds, **out** the period of 10sec' => [319_690_839, '762124', 10, true];
-        yield 'Leeway of 10 seconds, **out** the period of 11sec' => [319_690_840, '762124', 10, false];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second before)' => [
+            319_690_789,
+            '762124',
+            10,
+            false,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second before)' => [
+            319_690_790,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec (1 second before)' => [319_690_799, '762124', 10, true];
+        yield 'No leeway, **out** the period (1 second before)' => [319_690_799, '762124', 0, false];
+        yield 'No leeway, in the period (start)' => [319_690_800, '762124', 0, true];
+        yield 'No leeway, in the period (middle)' => [319_690_820, '762124', 0, true];
+        yield 'No leeway, in the period (end)' => [319_690_829, '762124', 0, true];
+        yield 'No leeway, **out** the period (1 second after)' => [319_690_830, '762124', 0, false];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec (1 second after)' => [319_690_830, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second after)' => [
+            319_690_839,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second after)' => [
+            319_690_840,
+            '762124',
+            10,
+            false,
+        ];
     }
 
     /**
