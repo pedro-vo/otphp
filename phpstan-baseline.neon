@@ -39,13 +39,3 @@ parameters:
 			message: "#^Parameter \\#1 \\$dateTime of method OTPHP\\\\Test\\\\ClockMock\\:\\:setDateTime\\(\\) expects DateTimeImmutable\\|null, DateTimeImmutable\\|false given\\.$#"
 			count: 5
 			path: tests/TOTPTest.php
-
-		-
-			message: "#^Parameter \\#1 \\$otp of method OTPHP\\\\TOTP\\:\\:verify\\(\\) expects non\\-empty\\-string, string given\\.$#"
-			count: 2
-			path: tests/TOTPTest.php
-
-		-
-			message: "#^Parameter \\#3 \\$leeway of method OTPHP\\\\TOTP\\:\\:verify\\(\\) expects int\\<0, max\\>\\|null, int given\\.$#"
-			count: 2
-			path: tests/TOTPTest.php

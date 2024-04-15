@@ -35,6 +35,10 @@ interface OTPInterface
     public function setDigest(string $digest): void;
 
     /**
+     * Generate the OTP at the specified input.
+     *
+     * @param 0|positive-int $input
+     *
      * @return non-empty-string Return the OTP at the specified timestamp
      */
     public function at(int $input): string;

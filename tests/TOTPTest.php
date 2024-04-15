@@ -6,7 +6,6 @@ namespace OTPHP\Test;
 
 use DateTimeImmutable;
 use InvalidArgumentException;
-use Iterator;
 use OTPHP\InternalClock;
 use OTPHP\TOTP;
 use OTPHP\TOTPInterface;
@@ -240,9 +239,9 @@ final class TOTPTest extends TestCase
      * @see https://tools.ietf.org/html/rfc6238#appendix-B
      * @see http://www.rfc-editor.org/errata_search.php?rfc=6238
      *
-     *  @return array<int, mixed[]>
+     *  @return iterable<int, mixed[]>
      */
-    public static function dataVectors(): Iterator
+    public static function dataVectors(): iterable
     {
         $sha1key = Base32::encodeUpper('12345678901234567890');
         assert($sha1key !== '');
@@ -318,7 +317,10 @@ final class TOTPTest extends TestCase
         static::assertSame($expectedResult, $otp->verify($input, null, $leeway));
     }
 
-    public static function dataLeewayWithEpoch(): Iterator
+    /**
+     * @return iterable<array-key, int|string|bool>[]
+     */
+    public static function dataLeewayWithEpoch(): iterable
     {
         yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second before)' => [
             319_690_889,
@@ -377,7 +379,7 @@ final class TOTPTest extends TestCase
     /**
      * @return int[][]
      */
-    public static function dataRemainingTimeBeforeExpiration(): Iterator
+    public static function dataRemainingTimeBeforeExpiration(): iterable
     {
         yield [1_644_926_810, 90, 40];
         yield [1_644_926_810, 30, 10];
@@ -394,9 +396,9 @@ final class TOTPTest extends TestCase
     }
 
     /**
-     * @return array<int, int|string|bool>[]
+     * @return iterable<int, int|string|bool>[]
      */
-    public static function dataLeeway(): Iterator
+    public static function dataLeeway(): iterable
     {
         yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second before)' => [
             319_690_789,

@@ -90,6 +90,11 @@ final class TOTP extends OTP implements TOTPInterface
         return $period - ($this->clock->now()->getTimestamp() % $this->getPeriod());
     }
 
+    /**
+     * The OTP at the specified input.
+     *
+     * @param 0|positive-int $input
+     */
     public function at(int $input): string
     {
         return $this->generateOTP($this->timecode($input));
@@ -97,12 +102,19 @@ final class TOTP extends OTP implements TOTPInterface
 
     public function now(): string
     {
-        return $this->at($this->clock->now()->getTimestamp());
+        $timestamp = $this->clock->now()
+            ->getTimestamp();
+        assert($timestamp >= 0, 'The timestamp must return a positive integer.');
+
+        return $this->at($timestamp);
     }
 
     /**
      * If no timestamp is provided, the OTP is verified at the actual timestamp. When used, the leeway parameter will
      * allow time drift. The passed value is in seconds.
+     *
+     * @param 0|positive-int $timestamp
+     * @param null|0|positive-int $leeway
      */
     public function verify(string $otp, null|int $timestamp = null, null|int $leeway = null): bool
     {
@@ -118,8 +130,12 @@ final class TOTP extends OTP implements TOTPInterface
         $leeway < $this->getPeriod() || throw new InvalidArgumentException(
             'The leeway must be lower than the TOTP period'
         );
+        $timestampMinusLeeway = $timestamp - $leeway;
+        $timestampMinusLeeway >= 0 || throw new InvalidArgumentException(
+            'The timestamp must be greater than or equal to the leeway.'
+        );
 
-        return $this->compareOTP($this->at($timestamp - $leeway), $otp)
+        return $this->compareOTP($this->at($timestampMinusLeeway), $otp)
             || $this->compareOTP($this->at($timestamp), $otp)
             || $this->compareOTP($this->at($timestamp + $leeway), $otp);
     }
