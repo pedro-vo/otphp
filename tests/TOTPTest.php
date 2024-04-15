@@ -313,7 +313,7 @@ final class TOTPTest extends TestCase
     ): void {
         $clock = new ClockMock();
         $clock->setDateTime(DateTimeImmutable::createFromFormat('U', (string) $timestamp));
-        $otp = self::createTOTP(6, 'sha1', 30, 'JDDK4U6G3BJLEZ7Y', 'alice@foo.bar', 'My Project', 100);
+        $otp = self::createTOTP(6, 'sha1', 30, 'JDDK4U6G3BJLEZ7Y', 'alice@foo.bar', 'My Project', 100, $clock);
 
         static::assertSame($expectedResult, $otp->verify($input, null, $leeway));
     }
