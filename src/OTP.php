@@ -35,6 +35,9 @@ abstract class OTP implements OTPInterface
         return str_replace($placeholder, $provisioning_uri, $uri);
     }
 
+    /**
+     * @param 0|positive-int $input
+     */
     public function at(int $input): string
     {
         return $this->generateOTP($input);
@@ -50,6 +53,8 @@ abstract class OTP implements OTPInterface
 
     /**
      * The OTP at the specified input.
+     *
+     * @param 0|positive-int $input
      *
      * @return non-empty-string
      */
@@ -98,7 +103,7 @@ abstract class OTP implements OTPInterface
         $this->hasColon($label) === false || throw new InvalidArgumentException('Label must not contain a colon.');
         $options = [...$options, ...$this->getParameters()];
         $this->filterOptions($options);
-        $params = str_replace(['+', '%7E'], ['%20', '~'], http_build_query($options));
+        $params = str_replace(['+', '%7E'], ['%20', '~'], http_build_query($options, arg_separator: '&'));
 
         return sprintf(
             'otpauth://%s/%s?%s',

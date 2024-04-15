@@ -100,14 +100,25 @@ final class TOTPTest extends TestCase
     }
 
     #[Test]
-    #[DataProvider('dataRemainingTimeBeforeExpiration')]
+    public function getProvisioningUriWithNonDefaultArgSeperator(): void
+    {
+        $otp = self::createTOTP(6, 'sha1', 30);
+
+        ini_set('arg_separator.output', '&amp;');
+
+        static::assertSame(
+            'otpauth://totp/My%20Project%3Aalice%40foo.bar?issuer=My%20Project&secret=JDDK4U6G3BJLEZ7Y',
+            $otp->getProvisioningUri()
+        );
+    }
+
     /**
      * @param positive-int $timestamp
      * @param positive-int $period
      * @param positive-int $expectedRemainder
-     * @test
-     * @dataProvider dataRemainingTimeBeforeExpiration
      */
+    #[Test]
+    #[DataProvider('dataRemainingTimeBeforeExpiration')]
     public function getRemainingTimeBeforeExpiration(int $timestamp, int $period, int $expectedRemainder): void
     {
         $clock = new ClockMock();
@@ -214,7 +225,7 @@ final class TOTPTest extends TestCase
     /**
      * @param TOTPInterface $totp
      * @param positive-int      $timestamp
-     * @param non-empty-string  $expected_value
+     * @param non-empty-string $expected_value
      */
     #[Test]
     #[DataProvider('dataVectors')]
@@ -228,9 +239,9 @@ final class TOTPTest extends TestCase
      * @see https://tools.ietf.org/html/rfc6238#appendix-B
      * @see http://www.rfc-editor.org/errata_search.php?rfc=6238
      *
-     * @return array<int, mixed[]>
+     *  @return iterable<int, mixed[]>
      */
-    public static function dataVectors(): array
+    public static function dataVectors(): iterable
     {
         $sha1key = Base32::encodeUpper('12345678901234567890');
         assert($sha1key !== '');
@@ -241,27 +252,24 @@ final class TOTPTest extends TestCase
         $sha512key = Base32::encodeUpper('1234567890123456789012345678901234567890123456789012345678901234');
         assert($sha512key !== '');
         $totp_sha512 = self::createTOTP(8, 'sha512', 30, $sha512key);
-
-        return [
-            [$totp_sha1, 59, '94287082'],
-            [$totp_sha256, 59, '46119246'],
-            [$totp_sha512, 59, '90693936'],
-            [$totp_sha1, 1_111_111_109, '07081804'],
-            [$totp_sha256, 1_111_111_109, '68084774'],
-            [$totp_sha512, 1_111_111_109, '25091201'],
-            [$totp_sha1, 1_111_111_111, '14050471'],
-            [$totp_sha256, 1_111_111_111, '67062674'],
-            [$totp_sha512, 1_111_111_111, '99943326'],
-            [$totp_sha1, 1_234_567_890, '89005924'],
-            [$totp_sha256, 1_234_567_890, '91819424'],
-            [$totp_sha512, 1_234_567_890, '93441116'],
-            [$totp_sha1, 2_000_000_000, '69279037'],
-            [$totp_sha256, 2_000_000_000, '90698825'],
-            [$totp_sha512, 2_000_000_000, '38618901'],
-            [$totp_sha1, 20_000_000_000, '65353130'],
-            [$totp_sha256, 20_000_000_000, '77737706'],
-            [$totp_sha512, 20_000_000_000, '47863826'],
-        ];
+        yield [$totp_sha1, 59, '94287082'];
+        yield [$totp_sha256, 59, '46119246'];
+        yield [$totp_sha512, 59, '90693936'];
+        yield [$totp_sha1, 1_111_111_109, '07081804'];
+        yield [$totp_sha256, 1_111_111_109, '68084774'];
+        yield [$totp_sha512, 1_111_111_109, '25091201'];
+        yield [$totp_sha1, 1_111_111_111, '14050471'];
+        yield [$totp_sha256, 1_111_111_111, '67062674'];
+        yield [$totp_sha512, 1_111_111_111, '99943326'];
+        yield [$totp_sha1, 1_234_567_890, '89005924'];
+        yield [$totp_sha256, 1_234_567_890, '91819424'];
+        yield [$totp_sha512, 1_234_567_890, '93441116'];
+        yield [$totp_sha1, 2_000_000_000, '69279037'];
+        yield [$totp_sha256, 2_000_000_000, '90698825'];
+        yield [$totp_sha512, 2_000_000_000, '38618901'];
+        yield [$totp_sha1, 20_000_000_000, '65353130'];
+        yield [$totp_sha256, 20_000_000_000, '77737706'];
+        yield [$totp_sha512, 20_000_000_000, '47863826'];
     }
 
     #[Test]
@@ -273,13 +281,13 @@ final class TOTPTest extends TestCase
         $otp->verify('123456', null, 31);
     }
 
-    #[Test]
-    #[DataProvider('dataLeeway')]
     /**
      * @param positive-int $timestamp
      * @param non-empty-string $input
-     * @param 0|positive-int $leeway
+     * @param positive-int $leeway
      */
+    #[Test]
+    #[DataProvider('dataLeeway')]
     public function verifyOtpInWindow(int $timestamp, string $input, int $leeway, bool $expectedResult): void
     {
         $clock = new ClockMock();
@@ -289,13 +297,13 @@ final class TOTPTest extends TestCase
         static::assertSame($expectedResult, $otp->verify($input, null, $leeway));
     }
 
-    #[Test]
-    #[DataProvider('dataLeewayWithEpoch')]
     /**
      * @param positive-int $timestamp
      * @param non-empty-string $input
-     * @param 0|positive-int $leeway
+     * @param positive-int $leeway
      */
+    #[Test]
+    #[DataProvider('dataLeewayWithEpoch')]
     public function verifyOtpWithEpochInWindow(
         int $timestamp,
         string $input,
@@ -310,22 +318,40 @@ final class TOTPTest extends TestCase
     }
 
     /**
-     * @return array<int, int|string|bool>[]
+     * @return iterable<array-key, int|string|bool>[]
      */
-    public static function dataLeewayWithEpoch(): array
+    public static function dataLeewayWithEpoch(): iterable
     {
-        return [
-            [319_690_889, '762124', 10, false], //Leeway of 10 seconds, **out** the period of 11sec
-            [319_690_890, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 10sec
-            [319_690_899, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 1sec
-            [319_690_899, '762124', 0, false], //No leeway, **out** the period
-            [319_690_900, '762124', 0, true], //No leeway, in the period
-            [319_690_920, '762124', 0, true], //No leeway, in the period
-            [319_690_929, '762124', 0, true], //No leeway, in the period
-            [319_690_930, '762124', 0, false], //No leeway, **out** the period
-            [319_690_930, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 1sec
-            [319_690_939, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 10sec
-            [319_690_940, '762124', 10, false], //Leeway of 10 seconds, **out** the period of 11sec
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second before)' => [
+            319_690_889,
+            '762124',
+            10,
+            false,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second before)' => [
+            319_690_890,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period (1 second before)' => [319_690_899, '762124', 10, true];
+        yield 'No leeway, **out** the period (1 second before)' => [319_690_899, '762124', 0, false];
+        yield 'No leeway, in the period (start)' => [319_690_900, '762124', 0, true];
+        yield 'No leeway, in the period (middle)' => [319_690_920, '762124', 0, true];
+        yield 'No leeway, in the period (end)' => [319_690_929, '762124', 0, true];
+        yield 'No leeway, **out** the period (1 second after)' => [319_690_930, '762124', 0, false];
+        yield 'Leeway of 10 seconds, **out** the period (1 second after)' => [319_690_930, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second after)' => [
+            319_690_939,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second after)' => [
+            319_690_940,
+            '762124',
+            10,
+            false,
         ];
     }
 
@@ -353,41 +379,57 @@ final class TOTPTest extends TestCase
     /**
      * @return int[][]
      */
-    public static function dataRemainingTimeBeforeExpiration(): array
+    public static function dataRemainingTimeBeforeExpiration(): iterable
     {
-        return [
-            [1_644_926_810, 90, 40],
-            [1_644_926_810, 30, 10],
-            [1_644_926_810, 20, 10],
-            [1_577_833_199, 90, 1],
-            [1_577_833_199, 30, 1],
-            [1_577_833_199, 20, 1],
-            [1_577_833_200, 90, 90],
-            [1_577_833_200, 30, 30],
-            [1_577_833_200, 20, 20],
-            [1_577_833_201, 90, 89],
-            [1_577_833_201, 30, 29],
-            [1_577_833_201, 20, 19],
-        ];
+        yield [1_644_926_810, 90, 40];
+        yield [1_644_926_810, 30, 10];
+        yield [1_644_926_810, 20, 10];
+        yield [1_577_833_199, 90, 1];
+        yield [1_577_833_199, 30, 1];
+        yield [1_577_833_199, 20, 1];
+        yield [1_577_833_200, 90, 90];
+        yield [1_577_833_200, 30, 30];
+        yield [1_577_833_200, 20, 20];
+        yield [1_577_833_201, 90, 89];
+        yield [1_577_833_201, 30, 29];
+        yield [1_577_833_201, 20, 19];
     }
 
     /**
-     * @return array<int, int|string|bool>[]
+     * @return iterable<int, int|string|bool>[]
      */
-    public static function dataLeeway(): array
+    public static function dataLeeway(): iterable
     {
-        return [
-            [319_690_789, '762124', 10, false], //Leeway of 10 seconds, **out** the period of 11sec
-            [319_690_790, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 10sec
-            [319_690_799, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 1sec
-            [319_690_799, '762124', 0, false], //No leeway, **out** the period
-            [319_690_800, '762124', 0, true], //No leeway, in the period
-            [319_690_820, '762124', 0, true], //No leeway, in the period
-            [319_690_829, '762124', 0, true], //No leeway, in the period
-            [319_690_830, '762124', 0, false], //No leeway, **out** the period
-            [319_690_830, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 1sec
-            [319_690_839, '762124', 10, true], //Leeway of 10 seconds, **out** the period of 10sec
-            [319_690_840, '762124', 10, false], //Leeway of 10 seconds, **out** the period of 11sec
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second before)' => [
+            319_690_789,
+            '762124',
+            10,
+            false,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second before)' => [
+            319_690_790,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec (1 second before)' => [319_690_799, '762124', 10, true];
+        yield 'No leeway, **out** the period (1 second before)' => [319_690_799, '762124', 0, false];
+        yield 'No leeway, in the period (start)' => [319_690_800, '762124', 0, true];
+        yield 'No leeway, in the period (middle)' => [319_690_820, '762124', 0, true];
+        yield 'No leeway, in the period (end)' => [319_690_829, '762124', 0, true];
+        yield 'No leeway, **out** the period (1 second after)' => [319_690_830, '762124', 0, false];
+        yield 'Leeway of 10 seconds, **out** the period of 1sec (1 second after)' => [319_690_830, '762124', 10, true];
+        yield 'Leeway of 10 seconds, **out** the period of 10sec (10 second after)' => [
+            319_690_839,
+            '762124',
+            10,
+            true,
+        ];
+        yield 'Leeway of 10 seconds, **out** the period of 11sec (11 second after)' => [
+            319_690_840,
+            '762124',
+            10,
+            false,
         ];
     }
 
