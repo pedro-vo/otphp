@@ -34,21 +34,25 @@ You have to verify that the server and the device are synchronized.
 
 # How to use
 
-To create an OTP object, just use the static `create` method. Your object will be able to generate passwords:
+To create an OTP object, just use the static `generate` method. Your object will be able to generate passwords.
+Note that the method will require a PSR-20 Clock in the next major release.
+It is higly recommended to pass it as first argument to the `generate` method in version 11.4+ to avoid any issue in the future.
 
 ```php
 <?php
 use OTPHP\TOTP;
 
+$clock = new MyClock(); // Your own implementation of a PSR-20 Clock
+
 // A random secret will be generated from this.
 // You should store the secret with the user for verification.
-$otp = TOTP::generate();
+$otp = TOTP::generate($clock);
 echo "The OTP secret is: {$otp->getSecret()}\n";
 
 // Note: use your own way to load the user secret.
 // The function "load_user_secret" is simply a placeholder.
 $secret = load_user_secret();
-$otp = TOTP::createFromSecret($secret);
+$otp = TOTP::createFromSecret($secret, $clock);
 echo "The current OTP is: {$otp->now()}\n";
 ```
 
@@ -56,6 +60,10 @@ In the example above, we use the `TOTP` class, but you can use the `HOTP` one th
 
 Then, you have to configure your applications. 
 You can use the provisioning Uri (`$otp->getProvisioningUri();`) as QR Code input to easily configure all of them.
+
+The provision URI can be stored in your database (or any other storage) and used to generate back the OTP object (see [Factory](Factory.md)).
+
+```php
 
 We recommend you to use your own QR Code generator (e.g. [BaconQrCode](https://packagist.org/packages/bacon/bacon-qr-code) or [endroid/qr-code](https://github.com/endroid/qr-code)).
 
