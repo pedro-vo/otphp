@@ -165,7 +165,7 @@ trait ParameterTrait
                     $value
                 ));
 
-                return $value;
+                return mb_strtoupper($value);
             },
             'digits' => static function ($value): int {
                 $value > 0 || throw new InvalidArgumentException('Digits must be at least 1.');
